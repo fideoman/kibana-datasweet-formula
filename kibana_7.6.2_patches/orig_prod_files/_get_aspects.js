@@ -17,7 +17,6 @@
  * under the License.
  */
 
-import _ from 'lodash';
 import { makeFakeXAspect } from './_fake_x_aspect';
 
 /**
@@ -36,11 +35,10 @@ export function getAspects(table, dimensions) {
       if (!d) {
         return;
       }
-      const columnIndex = _.findIndex(table.columns, (o) => o.id.startsWith(`col-${d.accessor}`));
-      if (-1 === columnIndex) {
+      const column = table.columns[d.accessor];
+      if (!column) {
         return;
       }
-      const column = table.columns[columnIndex];
       if (!aspects[name]) {
         aspects[name] = [];
       }

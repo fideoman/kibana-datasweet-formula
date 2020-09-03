@@ -92,10 +92,6 @@ uiModules.get('app/visualize').directive('visEditorSidebar', function() {
         agg.enabled = isEnable;
       };
 
-      $scope.onToggleHiddenAgg = (agg, isHidden) => {
-        agg.hidden = isHidden;
-      };
-
       $scope.reorderAggs = group => {
         //the aggs have been reordered in [group] and we need
         //to apply that ordering to [vis.aggs]

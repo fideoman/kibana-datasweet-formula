@@ -1,0 +1,291 @@
+--- ./orig_dev_files/agg_config.ts	2020-09-03 08:42:13.385152700 -0400
++++ ./dev_files/agg_config.ts	2020-09-03 07:29:02.666522200 -0400
+@@ -133,6 +133,7 @@
+     this.aggConfigs = aggConfigs;
+     this.id = String(opts.id || AggConfig.nextId(aggConfigs.aggs as any));
+     this.enabled = typeof opts.enabled === 'boolean' ? opts.enabled : true;
++    this.hidden = typeof opts.hidden === 'boolean' ? opts.hidden : false;
+ 
+     // start with empty params so that checks in type/schema setters don't freak
+     // because this.params is undefined
+--- ./orig_dev_files/components/agg.tsx	2020-09-03 08:42:13.402153900 -0400
++++ ./dev_files/components/agg.tsx	2020-09-03 07:29:02.682518200 -0400
+@@ -60,6 +60,7 @@
+   onAggParamsChange,
+   onAggTypeChange,
+   onToggleEnableAgg,
++  onToggleHiddenAgg,
+   removeAgg,
+   setTouched,
+   setValidity,
+@@ -140,12 +141,36 @@
+       });
+     }
+ 
++    if (agg.schema.name === 'metric') {
++      if (!agg.hidden && isRemovable) {
++        actionIcons.push({
++          id: 'hideAggregation',
++          color: 'text',
++          type: 'eye',
++          onClick: () => onToggleHiddenAgg(agg, true),
++          tooltip: 'Hide aggregation',
++          dataTestSubj: 'toggleShowAggregationBtn disable',
++        });
++      }
++
++      if (agg.hidden && isRemovable) {
++        actionIcons.push({
++          id: 'showAggregation',
++          color: 'text',
++          type: 'eyeClosed',
++          onClick: () => onToggleHiddenAgg(agg, false),
++          tooltip: 'Show aggregation',
++          dataTestSubj: 'toggleShowAggregationBtn enable',
++        });
++      }
++    }
++
+     if (agg.enabled && isRemovable) {
+       actionIcons.push({
+         id: 'disableAggregation',
+         color: 'text',
+         disabled: isDisabled,
+-        type: 'eye',
++        type: 'minusInCircle',
+         onClick: () => onToggleEnableAgg(agg, false),
+         tooltip: i18n.translate('common.ui.vis.editors.agg.disableAggButtonTooltip', {
+           defaultMessage: 'Disable aggregation',
+@@ -157,7 +182,7 @@
+       actionIcons.push({
+         id: 'enableAggregation',
+         color: 'text',
+-        type: 'eyeClosed',
++        type: 'minusInCircleFilled',
+         onClick: () => onToggleEnableAgg(agg, true),
+         tooltip: i18n.translate('common.ui.vis.editors.agg.enableAggButtonTooltip', {
+           defaultMessage: 'Enable aggregation',
+@@ -224,7 +249,7 @@
+ 
+   const buttonContent = (
+     <>
+-      {agg.schema.title} {showDescription && <span>{aggDescription}</span>}
++      {agg.schema.name === 'metric' && `${agg.id} -`} {agg.schema.title} {showDescription && <span>{aggDescription}</span>}
+     </>
+   );
+ 
+--- ./orig_dev_files/components/agg_common_props.ts	2020-09-03 08:42:13.419157600 -0400
++++ ./dev_files/components/agg_common_props.ts	2020-09-03 07:29:02.690517700 -0400
+@@ -40,6 +40,7 @@
+   onAggParamsChange: OnAggParamsChange;
+   onAggTypeChange: (agg: AggConfig, aggType: AggType) => void;
+   onToggleEnableAgg: (agg: AggConfig, isEnable: boolean) => void;
++  onToggleHiddenAgg: (agg: AggConfig, isHidden: boolean) => void;
+   removeAgg: (agg: AggConfig) => void;
+   setTouched: (isTouched: boolean) => void;
+   setValidity: (isValid: boolean) => void;
+--- ./orig_dev_files/components/agg_group.tsx	2020-09-03 08:42:13.436153200 -0400
++++ ./dev_files/components/agg_group.tsx	2020-09-03 07:29:02.696518300 -0400
+@@ -61,6 +61,7 @@
+   onAggParamsChange,
+   onAggTypeChange,
+   onToggleEnableAgg,
++  onToggleHiddenAgg,
+   removeAgg,
+   reorderAggs,
+   setTouched,
+@@ -187,6 +188,7 @@
+                     onAggParamsChange={onAggParamsChange}
+                     onAggTypeChange={onAggTypeChange}
+                     onToggleEnableAgg={onToggleEnableAgg}
++                    onToggleHiddenAgg={onToggleHiddenAgg}
+                     removeAgg={removeAgg}
+                     setTouched={isTouched => setTouchedHandler(agg.id, isTouched)}
+                     setValidity={isValid => setValidityHandler(agg.id, isValid)}
+--- ./orig_dev_files/utilities.ts	2020-09-03 08:42:13.449152900 -0400
++++ ./dev_files/utilities.ts	2020-09-03 07:29:02.709771200 -0400
+@@ -86,6 +86,12 @@
+       id: 'range',
+       params: { id: format.id, ...format.params },
+     }),
++    datasweet_formula: () => ({
++      id: agg.params.formatter,
++      params: {
++        pattern: agg.params.numeralFormat
++      },
++    }),
+   };
+ 
+   return formats[agg.type.name] ? formats[agg.type.name]() : format;
+--- ./orig_prod_files/agg_config.js	2020-09-03 08:42:13.468153900 -0400
++++ ./prod_files/agg_config.js	2020-09-03 07:29:02.720771300 -0400
+@@ -140,7 +140,8 @@
+ 
+     this.aggConfigs = aggConfigs;
+     this.id = String(opts.id || AggConfig.nextId(aggConfigs.aggs));
+-    this.enabled = typeof opts.enabled === 'boolean' ? opts.enabled : true; // start with empty params so that checks in type/schema setters don't freak
++    this.enabled = typeof opts.enabled === 'boolean' ? opts.enabled : true;
++    this.hidden = typeof opts.hidden === 'boolean' ? opts.hidden : false; // start with empty params so that checks in type/schema setters don't freak
+     // because this.params is undefined
+ 
+     this.params = {}; // setters
+--- ./orig_prod_files/agg_group.js	2020-09-03 08:42:13.464154200 -0400
++++ ./prod_files/agg_group.js	2020-09-03 07:29:02.727772800 -0400
+@@ -33,6 +33,7 @@
+       ['onAggParamsChange', { watchDepth: 'reference' }],
+       ['onAggTypeChange', { watchDepth: 'reference' }],
+       ['onToggleEnableAgg', { watchDepth: 'reference' }],
++      ['onToggleHiddenAgg', { watchDepth: 'reference' }],
+       ['removeAgg', { watchDepth: 'reference' }],
+       ['reorderAggs', { watchDepth: 'reference' }],
+       ['setTouched', { watchDepth: 'reference' }],
+@@ -62,6 +63,7 @@
+             on-agg-params-change="onAggParamsChange"
+             on-agg-type-change="onAggTypeChange"
+             on-toggle-enable-agg="onToggleEnableAgg"
++            on-toggle-hidden-agg="onToggleHiddenAgg"
+             remove-agg="removeAgg"
+             reorder-aggs="reorderAggs"
+             set-validity="setValidity"	
+--- ./orig_prod_files/components/agg.js	2020-09-03 08:42:13.474152900 -0400
++++ ./prod_files/components/agg.js	2020-09-03 07:29:02.734838400 -0400
+@@ -42,6 +42,7 @@
+       onAggParamsChange = _ref.onAggParamsChange,
+       onAggTypeChange = _ref.onAggTypeChange,
+       onToggleEnableAgg = _ref.onToggleEnableAgg,
++      onToggleHiddenAgg = _ref.onToggleHiddenAgg,
+       removeAgg = _ref.removeAgg,
+       setTouched = _ref.setTouched,
+       setValidity = _ref.setValidity;
+@@ -127,12 +128,40 @@
+       });
+     }
+ 
++    if (agg.schema.name === 'metric') {
++      if (!agg.hidden && isRemovable) {
++        actionIcons.push({
++          id: 'hideAggregation',
++          color: 'text',
++          type: 'eye',
++          onClick: function onClick() {
++            return onToggleHiddenAgg(agg, true);
++          },
++          tooltip: 'Hide aggregation',
++          dataTestSubj: 'toggleShowAggregationBtn disable'
++        });
++      }
++
++      if (agg.hidden && isRemovable) {
++        actionIcons.push({
++          id: 'showAggregation',
++          color: 'text',
++          type: 'eyeClosed',
++          onClick: function onClick() {
++            return onToggleHiddenAgg(agg, false);
++          },
++          tooltip: 'Show aggregation',
++          dataTestSubj: 'toggleShowAggregationBtn enable'
++        });
++      }
++    }
++
+     if (agg.enabled && isRemovable) {
+       actionIcons.push({
+         id: 'disableAggregation',
+         color: 'text',
+         disabled: isDisabled,
+-        type: 'eye',
++        type: 'minusInCircle',
+         onClick: function onClick() {
+           return onToggleEnableAgg(agg, false);
+         },
+@@ -147,7 +176,7 @@
+       actionIcons.push({
+         id: 'enableAggregation',
+         color: 'text',
+-        type: 'eyeClosed',
++        type: 'minusInCircleFilled',
+         onClick: function onClick() {
+           return onToggleEnableAgg(agg, true);
+         },
+@@ -212,7 +241,7 @@
+     }));
+   };
+ 
+-  var buttonContent = _react.default.createElement(_react.default.Fragment, null, agg.schema.title, " ", showDescription && _react.default.createElement("span", null, aggDescription));
++  var buttonContent = _react.default.createElement(_react.default.Fragment, null, agg.schema.name === 'metric' && "".concat(agg.id, " -"), " ", agg.schema.title, " ", showDescription && _react.default.createElement("span", null, aggDescription));
+ 
+   return _react.default.createElement(_eui.EuiAccordion, {
+     id: "visEditorAggAccordion".concat(agg.id),
+--- ./orig_prod_files/components/agg_group.js	2020-09-03 08:42:13.486153300 -0400
++++ ./prod_files/components/agg_group.js	2020-09-03 07:29:02.748837300 -0400
+@@ -43,6 +43,7 @@
+       onAggParamsChange = _ref.onAggParamsChange,
+       onAggTypeChange = _ref.onAggTypeChange,
+       onToggleEnableAgg = _ref.onToggleEnableAgg,
++      onToggleHiddenAgg = _ref.onToggleHiddenAgg,
+       removeAgg = _ref.removeAgg,
+       reorderAggs = _ref.reorderAggs,
+       setTouched = _ref.setTouched,
+@@ -169,6 +170,7 @@
+         onAggParamsChange: onAggParamsChange,
+         onAggTypeChange: onAggTypeChange,
+         onToggleEnableAgg: onToggleEnableAgg,
++        onToggleHiddenAgg: onToggleHiddenAgg,
+         removeAgg: removeAgg,
+         setTouched: function setTouched(isTouched) {
+           return setTouchedHandler(agg.id, isTouched);
+--- ./orig_prod_files/sidebar.js	2020-09-03 08:42:13.460155800 -0400
++++ ./prod_files/sidebar.js	2020-09-03 07:29:02.754838100 -0400
+@@ -92,6 +92,10 @@
+         agg.enabled = isEnable;
+       };
+ 
++      $scope.onToggleHiddenAgg = (agg, isHidden) => {
++        agg.hidden = isHidden;
++      };
++
+       $scope.reorderAggs = group => {
+         //the aggs have been reordered in [group] and we need
+         //to apply that ordering to [vis.aggs]
+--- ./orig_prod_files/utilities.js	2020-09-03 08:42:14.986469700 -0400
++++ ./prod_files/utilities.js	2020-09-03 07:29:02.758837800 -0400
+@@ -111,6 +111,14 @@
+           id: format.id
+         }, format.params)
+       };
++    },
++    datasweet_formula: function datasweet_formula() {
++      return {
++        id: agg.params.formatter,
++        params: {
++          pattern: agg.params.numeralFormat
++        }
++      };
+     }
+   };
+   return formats[agg.type.name] ? formats[agg.type.name]() : format;
+--- ./orig_prod_files/_get_aspects.js	2020-09-03 08:42:13.455152200 -0400
++++ ./prod_files/_get_aspects.js	2020-09-03 07:29:02.717772800 -0400
+@@ -17,6 +17,7 @@
+  * under the License.
+  */
+ 
++import _ from 'lodash';
+ import { makeFakeXAspect } from './_fake_x_aspect';
+ 
+ /**
+@@ -35,10 +36,11 @@
+       if (!d) {
+         return;
+       }
+-      const column = table.columns[d.accessor];
+-      if (!column) {
++      const columnIndex = _.findIndex(table.columns, (o) => o.id.startsWith(`col-${d.accessor}`));
++      if (-1 === columnIndex) {
+         return;
+       }
++      const column = table.columns[columnIndex];
+       if (!aspects[name]) {
+         aspects[name] = [];
+       }
